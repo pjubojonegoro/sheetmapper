@@ -1,0 +1,33 @@
+{
+	"name": "@mapbox-controls/ruler",
+	"version": "3.0.0",
+	"description": "Measure distance between points on a map",
+	"type": "module",
+	"main": "./src/index.js",
+	"scripts": {
+		"build": "tsc"
+	},
+	"dependencies": {
+		"@mapbox-controls/helpers": "workspace:*",
+		"@turf/distance": "7.1.0",
+		"@turf/helpers": "7.1.0"
+	},
+	"devDependencies": {
+		"@types/geojson": "catalog:",
+		"mapbox-gl": "catalog:"
+	},
+	"peerDependencies": {
+		"mapbox-gl": ">=1.0.0 <4.0.0"
+	},
+	"types": "./types/index.d.ts",
+	"files": [
+		"src",
+		"types"
+	],
+	"publishConfig": {
+		"access": "public",
+		"registry": "https://registry.npmjs.org/"
+	},
+	"repository": "korywka/mapbox-gl-controls",
+	"license": "MIT"
+}

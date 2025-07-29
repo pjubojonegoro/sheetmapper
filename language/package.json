@@ -1,0 +1,27 @@
+{
+	"name": "@mapbox-controls/language",
+	"version": "3.0.0",
+	"description": "Change map language",
+	"type": "module",
+	"main": "./src/index.js",
+	"scripts": {
+		"build": "tsc"
+	},
+	"devDependencies": {
+		"mapbox-gl": "catalog:"
+	},
+	"peerDependencies": {
+		"mapbox-gl": ">=1.0.0 <4.0.0"
+	},
+	"types": "./types/index.d.ts",
+	"files": [
+		"src",
+		"types"
+	],
+	"publishConfig": {
+		"access": "public",
+		"registry": "https://registry.npmjs.org/"
+	},
+	"repository": "korywka/mapbox-controls",
+	"license": "MIT"
+}

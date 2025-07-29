@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sheet Mapper</title>
+    <script src='https://api.mapbox.com/mapbox-gl-js/v3.11.0/mapbox-gl.js'></script>
+    <link href='https://api.mapbox.com/mapbox-gl-js/v3.11.0/mapbox-gl.css' rel='stylesheet' />
+    <script src='https://unpkg.com/papaparse@5.3.0/papaparse.min.js'></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <script src="https://cdn.jsdelivr.net/npm/@turf/turf@7/turf.min.js"></script>
+
+    <script src='https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v5.0.3/mapbox-gl-geocoder.min.js'></script>
+    <link rel='stylesheet' href='https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v5.0.3/mapbox-gl-geocoder.css' type='text/css' />
+    <link rel='stylesheet' href='mapbox-controls/ruler/src/index.css' type='text/css' />
+    <!-- Generate legend from Mapbox styles https://github.com/watergis/mapbox-gl-legend -->
+    <link href='https://watergis.github.io/mapbox-gl-legend/mapbox-gl-legend.css' rel='stylesheet' />
+<script src="https://watergis.github.io/mapbox-gl-legend/mapbox-gl-legend.js"></script>
+
+    <style>
+
+        body { margin: 0; padding: 0; }
+        
+        /* Mobile-first layout */
+        .layout-container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        header {
+            flex-shrink: 0;
+            width: 100%;
+            /* Allow header to scroll horizontally on mobile */
+            overflow-x: auto;
+        }
+
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+
+        #sidebar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 30vh;
+            width: 100%;
+            z-index: 10;
+            transform: translateY(70%);
+            transition: transform 0.3s ease-out;
+        }
+
+        #sidebar.expanded {
+            transform: translateY(0);
+        }
+
+        .sidebar-handle {
+            position: absolute;
+            top: -20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 50px;
+            height: 5px;
+            background: #e5e7eb;
+            border-radius: 999px;
+            cursor: pointer;
+        }
+
+        #map {
+            height: 100%;
+            width: 100%;
+        }
+
+        /* Tablet and desktop styles */
+        @media (min-width: 768px) {
+            .main-content {
+                flex-direction: row;
+            }
+
+            #sidebar {
+                position: relative;
+                width: 300px;
+                height: calc(100vh - 120px);
+                transform: none;
+            }
+
+            .sidebar-handle {
+                display: none;
+            }
+
+            #map {
+                flex: 1;
+            }
+        }
+
+        #center-marker {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+            z-index: 1;
+        }
+		
+		
+	
+		
+    </style>
+</head>
+<body>
+    <div class="layout-container">
+        <!-- Header -->
+        <header class="bg-white shadow-md p-4">
+            <div class="container mx-auto">
+                <!-- Initial sheet input state 
+                <div id="sheetInput" class="mb-4">
+                    <div class="text-center mb-2 text-sm text-gray-600">Drop CSV anywhere on page or</div>
+                    <div class="flex gap-2">
+                        <input 
+                            type="text" 
+                            id="sheetUrl" 
+                            placeholder="Paste Google Sheet URL here" 
+                            class="flex-1 px-4 py-2 border rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        >
+                    </div>
+                </div> -->
+
+                <!-- Sheet buttons (initially hidden)
+                <div id="sheetButtons" class="mb-4 flex gap-2" style="display: none;">
+                    <a id="viewSheetData" href="#" target="_blank" class="flex-1 px-4 py-2 bg-blue-500 text-white font-bold rounded hover:bg-blue-600 text-center text-sm md:text-base md:flex-none">
+                        Open Sheet
+                        <svg class="inline-block w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
+                        </svg>
+                    </a>
+                    <button id="downloadGeoJSON" class="flex-1 px-4 py-2 bg-green-500 text-white font-bold rounded hover:bg-green-600 text-sm md:text-base md:flex-none">
+                        Download GeoJSON
+                    </button>
+                </div> -->
+
+                <!-- Filters row -->
+                <div id="filterContainer" class="flex flex-nowrap items-center gap-2 overflow-x-auto pb-2">
+                    <!-- Filters will be dynamically added here -->
+                </div>
+            </div>
+        </header>
+
+        <!-- Main content -->
+        <div class="main-content">
+            <!-- Map container -->
+            <div id="map">
+             
+            </div>
+            <!-- Sidebar
+            <div id="sidebar" class="bg-white shadow-lg overflow-y-auto"> 
+                 <div class="sidebar-handle"></div>
+                 Content will be dynamically inserted here -->
+            <!-- </div>  -->
+        </div>
+    </div>
+
+    <!-- Add this script before your other scripts -->
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // Add drag and drop handlers
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                document.body.addEventListener(eventName, preventDefaults, false);
+            });
+
+            function preventDefaults(e) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+
+            // Handle file drop
+            document.body.addEventListener('drop', handleDrop, false);
+
+            function handleDrop(e) {
+                const dt = e.dataTransfer;
+                const file = dt.files[0];
+
+                if (file && file.type === 'text/csv') {
+                    const reader = new FileReader();
+                    reader.onload = function(event) {
+                        const csvData = event.target.result;
+                        
+                        // Parse CSV using Papa Parse
+                        const parsedData = Papa.parse(csvData, {
+                            header: true,
+                            dynamicTyping: true,
+                            skipEmptyLines: true
+                        }).data;
+
+                        // Hide input and show loading state
+                        const sheetUrl = document.getElementById('sheetUrl');
+                        sheetUrl.disabled = true;
+                        sheetUrl.classList.add('bg-gray-100');
+                        sheetUrl.value = 'Processing CSV file...';
+
+                        // Trigger data loading with the parsed CSV
+                        window.dispatchEvent(new CustomEvent('loadCSVData', { 
+                            detail: { 
+                                data: parsedData,
+                                onError: (error) => {
+                                    // Reset input on error
+                                    sheetUrl.disabled = false;
+                                    sheetUrl.classList.remove('bg-gray-100');
+                                    sheetUrl.classList.add('text-red-500');
+                                    sheetUrl.value = `Error: ${error.message}`;
+                                    
+                                    // Reset error state after 3 seconds
+                                    setTimeout(() => {
+                                        sheetUrl.classList.remove('text-red-500');
+                                        sheetUrl.value = '';
+                                    }, 3000);
+                                },
+                                onSuccess: () => {
+                                    // Hide input and show buttons on success
+                                    document.getElementById('sheetInput').style.display = 'none';
+                                    document.getElementById('sheetButtons').style.display = 'flex';
+                                    
+                                    // Update download button text
+                                    document.getElementById('downloadGeoJSON').textContent = 'Download GeoJSON';
+                                }
+                            } 
+                        }));
+                    };
+                    reader.readAsText(file);
+                } else {
+                    alert('Please drop a CSV file');
+                }
+            }
+
+            // Handle sidebar expansion on mobile
+            const sidebar = document.getElementById('sidebar');
+            const handle = document.querySelector('.sidebar-handle');
+
+            if (handle) {
+                handle.addEventListener('click', () => {
+                    sidebar.classList.toggle('expanded');
+                });
+            }
+
+            // Close sidebar when clicking on map (mobile only)
+            document.getElementById('map').addEventListener('click', () => {
+                if (window.innerWidth < 768) {
+                    sidebar.classList.remove('expanded');
+                }
+            });
+
+            // Sheet URL handling
+            const sheetInput = document.getElementById('sheetInput');
+            const sheetButtons = document.getElementById('sheetButtons');
+            const sheetUrl = document.getElementById('sheetUrl');
+
+            let loadingTimeout;
+
+            sheetUrl.addEventListener('input', (e) => {
+                clearTimeout(loadingTimeout);
+                
+                loadingTimeout = setTimeout(() => {
+                    const url = e.target.value;
+                    const sheetId = '12LaxCIzsjNc3Ss9YIvZ6f-ugnegui1PeGu37m9E9h6s';
+                    
+                    if (sheetId) {
+                        // Disable input and show loading state
+                        sheetUrl.disabled = true;
+                        sheetUrl.classList.add('bg-gray-100');
+                        sheetUrl.value = 'Loading sheet data...';
+                        
+                        // Update viewSheetData link
+                        const viewSheetData = document.getElementById('viewSheetData');
+                        viewSheetData.href = `https://docs.google.com/spreadsheets/d/${sheetId}`;
+                        
+                        // Trigger data loading
+                        window.dispatchEvent(new CustomEvent('loadSheetData', { 
+                            detail: { 
+                                sheetId,
+                                onError: (error) => {
+                                    // Reset input on error
+                                    sheetUrl.disabled = false;
+                                    sheetUrl.classList.remove('bg-gray-100');
+                                    sheetUrl.classList.add('text-red-500');
+                                    sheetUrl.value = `Error: ${error.message}`;
+                                    
+                                    // Reset error state after 3 seconds
+                                    setTimeout(() => {
+                                        sheetUrl.classList.remove('text-red-500');
+                                        sheetUrl.value = url;
+                                    }, 3000);
+                                },
+                                onSuccess: () => {
+                                    // Hide input and show buttons on success
+                                    sheetInput.style.display = 'none';
+                                    sheetButtons.style.display = 'flex';
+                                }
+                            } 
+                        }));
+                    }
+                }, 500); // Wait 500ms after typing stops
+            });
+
+            function extractSheetId(url) {
+                // Extract sheet ID from various Google Sheets URL formats
+                const patterns = [
+                    /\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/,
+                    /^([a-zA-Z0-9-_]+)$/
+                ];
+                
+                for (const pattern of patterns) {
+                    const match = url.match(pattern);
+                    if (match && match[1]) {
+                        return match[1];
+                    }
+                }
+                
+                return null;
+            }
+        });
+    </script>
+
+    <!-- Add this before sheet-mapper.js -->
+    <script type="module" src="csv-map.js"></script>
+</body>
+</html>
